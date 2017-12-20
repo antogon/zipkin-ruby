@@ -9,16 +9,20 @@ class AsyncJsonApiClient
 
   def perform(json_api_host, spans)
     spans_with_ips = ::ZipkinTracer::HostnameResolver.new.spans_with_ips(spans).map(&:to_h)
+    body = JSON.generate(spans_with_ips)
     resp = Faraday.new(json_api_host).post do |req|
       req.url SPANS_PATH
       req.headers['Content-Type'] = 'application/json'
-      req.body = JSON.generate(spans_with_ips)
+      req.body = body
     end
+    puts "Sent request with #{spans.size} spans #{body.inspect} and got #{resp.inspect} back."
   rescue Net::ReadTimeout, Faraday::ConnectionFailed => e
+    puts "In error block"
     error_message = "Error while connecting to #{json_api_host}: #{e.class.inspect} with message '#{e.message}'. " \
                     "Please make sure the URL / port are properly specified for the Zipkin server."
     SuckerPunch.logger.error(error_message)
   rescue => e
+    puts "In other error block"
     SuckerPunch.logger.error(e)
   end
 end
